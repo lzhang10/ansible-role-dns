@@ -1,21 +1,12 @@
 # vim: ai et ts=2 st=2 sw=2 :
 ---
-- name: Configure domains for network manager
+- name: Disable DNS for network manager
+  become: yes
   community.general.ini_file:
-    path: /etc/NetworkManager/conf.d/global-dns.conf
-    section: global-dns
-    option: searches
-    value: '{{ dns_domains | join(",") }}'
-    mode: '0644'
-    no_extra_spaces: true
-  register: conf_nm_domains
-
-- name: Configure domains for network manager
-  community.general.ini_file:
-    path: /etc/NetworkManager/conf.d/global-dns.conf
-    section: global-dns-domain-*
-    option: servers
-    value: '{{ dns_servers | join(",") }}'
+    path: /etc/NetworkManager/conf.d/90-dns-none.conf
+    section: main
+    option: dns
+    value: 'none'
     mode: '0644'
     no_extra_spaces: true
   register: conf_nm_dns
@@ -27,11 +18,18 @@
   register: network_manager_running
   check_mode: false
 
+- name: Distribute resolv.conf template
+  become: yes
+  ansible.builtin.template:
+    src: resolv.conf
+    dest: /etc/resolv.conf
+    mode: '0644'
+
 - name: Reload network manager
+  become: yes
   ansible.builtin.service:
     name: NetworkManager
     state: reloaded
   when:
-    - conf_nm_dns is changed or
-      conf_nm_domains is changed
+    - conf_nm_dns is changed
     - network_manager_running.rc == 0
